@@ -1,4 +1,4 @@
-from nilearn.datasets import fetch_abide_pcp
+from nilearn.datasets import fetch_abide_pcp, fetch_atlas_basc_multiscale_2015
 from nilearn.connectome import ConnectivityMeasure
 from nilearn.input_data import NiftiLabelsMasker
 import numpy as np
@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 def prepare_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     # get dataset
     print("Loading dataset...")
-    abide = datasets.fetch_abide_pcp(
+    abide = fetch_abide_pcp(
         data_dir=data_dir,
         SITE_ID=["CMU"],
         pipeline=pipeline,
@@ -23,6 +23,7 @@ def prepare_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     # load atlas
     multiscale = fetch_atlas_basc_multiscale_2015()
     atlas_filename = multiscale.scale064
+    print(f"atalas file names are: {atlas_filename}")
 
     # initialize masker object
     masker = NiftiLabelsMasker(
@@ -71,7 +72,9 @@ def run():
     output_path = (
         r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out"
     )
-    prepare_data(input_path, output_path)
+    adj_mat, y_target = prepare_data(input_path, output_path)
+    print(adj_mat.shape)
+    print(y_target)
 
 
 if __name__ == "__main__":
