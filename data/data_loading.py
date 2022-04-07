@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 
 
-def prepare_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
+def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     # get dataset
     print("Loading dataset...")
     abide = fetch_abide_pcp(
@@ -72,8 +72,11 @@ def run():
     output_path = (
         r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out"
     )
-    adj_mat, y_target = prepare_data(input_path, output_path)
+    adj_mat, y_target = load_data(input_path, output_path)
     print(adj_mat.shape)
+    print(type(adj_mat))
+    print(adj_mat)
+    print("***************************")
     print(y_target)
 
 
