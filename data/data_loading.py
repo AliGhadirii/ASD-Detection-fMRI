@@ -7,6 +7,28 @@ import pandas as pd
 from sklearn.decomposition import PCA
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Arguments for training the Inception_v3 model"
+    )
+    parser.add_argument(
+        "--input_path",
+        type=str,
+        default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Data",
+        help="Path to the data directory",
+        required=True,
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out",
+        help="Path to the output file",
+        required=True,
+    )
+    args = parser.parse_args()
+    return args
+
+
 def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     # get dataset
     print("Loading dataset...")
@@ -66,13 +88,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
 
 
 def run():
-    input_path = (
-        r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Data"
-    )
-    output_path = (
-        r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out"
-    )
-    adj_mat, y_target = load_data(input_path, output_path)
+    adj_mat, y_target = load_data(args.input_path, args.output_path)
     print(adj_mat.shape)
     print(type(adj_mat))
     print(adj_mat)
