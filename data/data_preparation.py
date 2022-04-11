@@ -11,6 +11,8 @@ from networkx.algorithms.centrality import (
 from networkx.algorithms.cluster import clustering
 import torch
 from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
+from torch_geometric.data import InMemoryDataset
 
 
 def parse_arguments():
@@ -24,11 +26,18 @@ def parse_arguments():
         help="Path to the adjacancy matrix",
         required=True,
     )
+    parser.add_argument(
+        "--y_path",
+        type=str,
+        default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out\Y_target.npz",
+        help="Path to the adjacancy matrix",
+        required=True,
+    )
     args = parser.parse_args()
     return args
 
 
-def data_preparation(adj_path):
+def data_preparation(adj_path, y_path, batch_size=1):
     """Creates Data object of pytorch_geometric using graph features and edge list
 
     Parameters
@@ -41,34 +50,46 @@ def data_preparation(adj_path):
     Data Object [torch_geometric.loader.DataLoader]
     """
 
-    data = np.load(args.adj_path)
+    data = np.load(adj_path)
     adj_mat = data["a"]
+
+    label = np.load(y_path)
+    y_target = label["a"]
+
     adj_mat = np.greater_equal(adj_mat, 0.5).astype(int)
 
+    data_list = []
     ## Create a graph using networkx
-    G = nx.from_numpy_matrix(adj_mat[0])
+    for i in range(adj_mat.shape[0]):
+        G = nx.from_numpy_matrix(adj_mat[i])
 
-    ## Extract features
-    features = pd.DataFrame(
-        {
-            "degree": dict(G.degree).values(),
-            "eigen_vector_centrality": dict(nx.eigenvector_centrality(G)).values(),
-            "betweenness": dict(betweenness_centrality(G)).values(),
-            "closeness": dict(closeness_centrality(G)).values(),
-            "clustring_coef": dict(clustering(G)).values(),
-        }
-    )
+        ## Extract features
+        features = pd.DataFrame(
+            {
+                "degree": dict(G.degree).values(),
+                "eigen_vector_centrality": dict(nx.eigenvector_centrality(G)).values(),
+                "betweenness": dict(betweenness_centrality(G)).values(),
+                "closeness": dict(closeness_centrality(G)).values(),
+                "clustring_coef": dict(clustering(G)).values(),
+            }
+        )
 
-    X = torch.tensor(features.values)
-    edge_index = torch.tensor(list(G.edges()))
-    data_obj = Data(x=X, edge_index=edge_index)
-    return data_obj
+        X = torch.tensor(features.values)
+        edge_index = torch.tensor(list(G.edges()))
+
+        data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i]))
+
+    loader = DataLoader(data_list, batch_size=batch_size)
+    # data, slices = InMemoryDataset.collate(data_list) --> Not needed : collects and comibes all graphs to one graph
+    return loader
 
 
 def main():
     args = parse_arguments()
-    data = data_preparation(args.adj_path)
-    print(data)
+    loader = data_preparation(args.adj_path, args.y_path)
+    for data in loader:
+        print(data)
+        print(data.y)
 
 
 if __name__ == "__main__":

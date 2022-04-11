@@ -84,6 +84,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
 
     # Get the target vector
     y_target = abide_pheno["DX_GROUP"]
+    np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
 
     return adj_mat, y_target
 
@@ -95,7 +96,8 @@ def run():
     print(type(adj_mat))
     print(adj_mat)
     print("***************************")
-    print(y_target)
+    print(y_target.shape)
+    print(type(y_target))
 
 
 if __name__ == "__main__":
