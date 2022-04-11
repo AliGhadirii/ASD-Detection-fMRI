@@ -1,4 +1,5 @@
 from nilearn.datasets import fetch_abide_pcp, fetch_atlas_basc_multiscale_2015
+import argparse
 from nilearn.connectome import ConnectivityMeasure
 from nilearn.input_data import NiftiLabelsMasker
 import numpy as np
@@ -88,6 +89,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
 
 
 def run():
+    args = parse_arguments()
     adj_mat, y_target = load_data(args.input_path, args.output_path)
     print(adj_mat.shape)
     print(type(adj_mat))

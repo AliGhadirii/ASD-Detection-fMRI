@@ -1,4 +1,5 @@
 import numpy as np
+import argparse
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -65,6 +66,7 @@ def data_preparation(adj_path):
 
 
 def main():
+    args = parse_arguments()
     data = data_preparation(args.adj_path)
     print(data)
 
