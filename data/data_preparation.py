@@ -30,9 +30,17 @@ def parse_arguments():
         "--y_path",
         type=str,
         default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out\Y_target.npz",
-        help="Path to the adjacancy matrix",
+        help="Path to the y target",
         required=True,
     )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=1,
+        help="Size of batch",
+        required=False,
+    )
+
     args = parser.parse_args()
     return args
 
@@ -77,7 +85,8 @@ def data_preparation(adj_path, y_path, batch_size=1):
         X = torch.tensor(features.values)
         edge_index = torch.tensor(list(G.edges()))
 
-        data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i]))
+        # print(y_target[i].item())
+        data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i].item()))
 
     loader = DataLoader(data_list, batch_size=batch_size)
     # data, slices = InMemoryDataset.collate(data_list) --> Not needed : collects and comibes all graphs to one graph
@@ -86,7 +95,7 @@ def data_preparation(adj_path, y_path, batch_size=1):
 
 def main():
     args = parse_arguments()
-    loader = data_preparation(args.adj_path, args.y_path)
+    loader = data_preparation(args.adj_path, args.y_path, args.batch_size)
     for data in loader:
         print(data)
         print(data.y)

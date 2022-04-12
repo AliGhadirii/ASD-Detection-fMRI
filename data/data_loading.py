@@ -71,6 +71,8 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
         for i, sub in enumerate(fmri_filenames):
             # extract the timeseries from the ROIs in the atlas
             time_series = masker.fit_transform(sub)
+
+            print(f"shape of time series{i}: {time_series.shape}")
             # create a region x region correlation matrix
             correlation_matrix = correlation_measure.fit_transform([time_series])[0]
             # add to our container
@@ -84,6 +86,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
 
     # Get the target vector
     y_target = abide_pheno["DX_GROUP"]
+    y_target = y_target.apply(lambda x: x - 1)
     np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
 
     return adj_mat, y_target
@@ -93,11 +96,8 @@ def run():
     args = parse_arguments()
     adj_mat, y_target = load_data(args.input_path, args.output_path)
     print(adj_mat.shape)
-    print(type(adj_mat))
-    print(adj_mat)
     print("***************************")
     print(y_target.shape)
-    print(type(y_target))
 
 
 if __name__ == "__main__":
