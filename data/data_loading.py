@@ -1,7 +1,11 @@
-from nilearn.datasets import fetch_abide_pcp, fetch_atlas_basc_multiscale_2015
+from nilearn.datasets import (
+    fetch_abide_pcp,
+    fetch_atlas_basc_multiscale_2015,
+    fetch_coords_power_2011,
+)
 import argparse
 from nilearn.connectome import ConnectivityMeasure
-from nilearn.input_data import NiftiLabelsMasker
+from nilearn.input_data import NiftiLabelsMasker, NiftiSpheresMasker
 import numpy as np
 import os
 import pandas as pd
@@ -43,19 +47,37 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     # make list of filenames
     fmri_filenames = abide.func_preproc
 
+    """ Previous Atlas
     # load atlas
     multiscale = fetch_atlas_basc_multiscale_2015()
+    # print(multiscale)
     atlas_filename = multiscale.scale064
-    print(f"atalas file names are: {atlas_filename}")
-
-    # initialize masker object
+    # print(f"atalas file names are: {atlas_filename}")
+    
+    initialize masker object
     masker = NiftiLabelsMasker(
         labels_img=atlas_filename, standardize=True, memory="nilearn_cache", verbose=0
+    )
+    """
+
+    # load power atlas
+    power = fetch_coords_power_2011()
+    coords = np.vstack((power.rois["x"], power.rois["y"], power.rois["z"])).T
+    print("Stacked power coordinates in array of shape {0}.".format(coords.shape))
+
+    # initialize masker object
+    # NiftiSpheresMasker is useful when data from given seeds should be extracted.
+    masker = NiftiSpheresMasker(
+        seeds=coords,
+        radius=5,  # Indicates, in millimeters, the radius for the sphere around the seed
+        standardize=True,  # the signal is z-scored. Timeseries are shifted to zero mean and scaled to unit variance
+        memory="nilearn_cache",
+        verbose=2,
     )
 
     # initialize correlation measure
     correlation_measure = ConnectivityMeasure(
-        kind="correlation", vectorize=False, discard_diagonal=True
+        kind="tangent", vectorize=False, discard_diagonal=True
     )
 
     try:  # check if feature file already exists
@@ -73,6 +95,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
             time_series = masker.fit_transform(sub)
 
             print(f"shape of time series{i}: {time_series.shape}")
+            print(f"type of time series{i}: {type(time_series)}")
             # create a region x region correlation matrix
             correlation_matrix = correlation_measure.fit_transform([time_series])[0]
             # add to our container
@@ -81,6 +104,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
             print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
         # Save features
         np.savez_compressed(os.path.join(output_dir, "ABIDE_adjacency"), a=adj_mat)
+        adj_mat = np.array(adj_mat)
 
     abide_pheno = pd.DataFrame(abide.phenotypic)
 
