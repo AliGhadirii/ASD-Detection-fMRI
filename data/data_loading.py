@@ -83,28 +83,25 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     try:  # check if feature file already exists
         # load features
         feat_file = os.path.join(output_dir, "ABIDE_adjacency.npz")
-        adj_mat = np.load(feat_file)["a"]
+        correlation_matrices = np.load(feat_file)["a"]
         print("Feature file found.")
 
     except:  # if not, extract features
-        adj_mat = []  # To contain upper half of matrix as 1d array
         print("No feature file found. Extracting features...")
 
+        time_series_ls = []
         for i, sub in enumerate(fmri_filenames):
             # extract the timeseries from the ROIs in the atlas
             time_series = masker.fit_transform(sub)
 
             print(f"shape of time series{i}: {time_series.shape}")
-            print(f"type of time series{i}: {type(time_series)}")
-            # create a region x region correlation matrix
-            correlation_matrix = correlation_measure.fit_transform([time_series])[0]
-            # add to our container
-            adj_mat.append(correlation_matrix)
-            # keep track of status
+            time_series_ls.append(time_series)
             print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
-        # Save features
-        np.savez_compressed(os.path.join(output_dir, "ABIDE_adjacency"), a=adj_mat)
-        adj_mat = np.array(adj_mat)
+
+        correlation_matrices = correlation_measure.fit_transform(time_series_ls)
+        np.savez_compressed(
+            os.path.join(output_dir, "ABIDE_adjacency"), a=correlation_matrices
+        )
 
     abide_pheno = pd.DataFrame(abide.phenotypic)
 
@@ -113,7 +110,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     y_target = y_target.apply(lambda x: x - 1)
     np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
 
-    return adj_mat, y_target
+    return correlation_matrices, y_target
 
 
 def run():
