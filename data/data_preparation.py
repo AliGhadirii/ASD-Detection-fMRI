@@ -41,12 +41,19 @@ def parse_arguments():
         help="Size of batch",
         required=False,
     )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="Threshold",
+        required=False,
+    )
 
     args = parser.parse_args()
     return args
 
 
-def data_preparation(adj_path, y_path, batch_size=1):
+def data_preparation(adj_path, y_path, batch_size=1, threshold=0.6):
     """Creates Data object of pytorch_geometric using graph features and edge list
 
     Parameters
@@ -61,11 +68,15 @@ def data_preparation(adj_path, y_path, batch_size=1):
 
     data = np.load(adj_path)
     adj_mat = data["a"]
+    # print(f"max: {np.max(adj_mat)}")
+    # print(f"min: {np.min(adj_mat)}")
+    # print(f"quantile: {np.min(adj_mat)}")
+    # print(f"shape: {adj_mat.shape}")
 
     label = np.load(y_path)
     y_target = label["a"]
 
-    adj_mat = np.greater_equal(adj_mat, 0.7).astype(int)
+    adj_mat = np.greater_equal(adj_mat, threshold).astype(int)
 
     data_list = []
     ## Create a graph using networkx

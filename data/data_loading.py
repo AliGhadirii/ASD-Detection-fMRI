@@ -30,11 +30,20 @@ def parse_arguments():
         help="Path to the output file",
         required=True,
     )
+    parser.add_argument(
+        "--fc_matrix_kind",
+        type=str,
+        default="correlation",
+        help="different kinds of functional connectivity matrices : covariance, correlation, partial correlation, tangent, precision",
+        required=False,
+    )
     args = parser.parse_args()
     return args
 
 
-def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
+def load_data(
+    data_dir, output_dir, fc_matrix_kind, pipeline="cpac", quality_checked=True
+):
     # get dataset
     print("Loading dataset...")
     abide = fetch_abide_pcp(
@@ -77,7 +86,7 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
 
     # initialize correlation measure
     correlation_measure = ConnectivityMeasure(
-        kind="tangent", vectorize=False, discard_diagonal=True
+        kind=fc_matrix_kind, vectorize=False, discard_diagonal=True
     )
 
     try:  # check if feature file already exists
@@ -89,23 +98,37 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
     except:  # if not, extract features
         print("No feature file found. Extracting features...")
 
-        time_series_ls = []
-        for i, sub in enumerate(fmri_filenames):
-            # extract the timeseries from the ROIs in the atlas
-            time_series = masker.fit_transform(sub)
+        if fc_matrix_kind == "tangent":
+            time_series_ls = []
+            for i, sub in enumerate(fmri_filenames):
+                # extract the timeseries from the ROIs in the atlas
+                time_series = masker.fit_transform(sub)
 
-            print(f"shape of time series{i}: {time_series.shape}")
-            time_series_ls.append(time_series)
-            print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
+                print(f"shape of time series{i}: {time_series.shape}")
+                time_series_ls.append(time_series)
+                print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
 
-        correlation_matrices = correlation_measure.fit_transform(time_series_ls)
+            correlation_matrices = correlation_measure.fit_transform(time_series_ls)
+
+        else:
+            correlation_matrices = []
+            for i, sub in enumerate(fmri_filenames):
+                # extract the timeseries from the ROIs in the atlas
+                time_series = masker.fit_transform(sub)
+                # create a region x region correlation matrix
+                correlation_matrix = correlation_measure.fit_transform([time_series])[0]
+                # add to our container
+                correlation_matrices.append(correlation_matrix)
+
+                print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
+
         np.savez_compressed(
             os.path.join(output_dir, "ABIDE_adjacency"), a=correlation_matrices
         )
-
-    abide_pheno = pd.DataFrame(abide.phenotypic)
+        correlation_matrices = np.array(correlation_matrices)
 
     # Get the target vector
+    abide_pheno = pd.DataFrame(abide.phenotypic)
     y_target = abide_pheno["DX_GROUP"]
     y_target = y_target.apply(lambda x: x - 1)
     np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
@@ -115,9 +138,11 @@ def load_data(data_dir, output_dir, pipeline="cpac", quality_checked=True):
 
 def run():
     args = parse_arguments()
-    adj_mat, y_target = load_data(args.input_path, args.output_path)
+    adj_mat, y_target = load_data(
+        args.input_path, args.output_path, args.fc_matrix_kind
+    )
     print(adj_mat.shape)
-    print("***************************")
+    print("****************************")
     print(y_target.shape)
 
 
