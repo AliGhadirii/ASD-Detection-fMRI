@@ -3,17 +3,14 @@ import argparse
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
-from networkx.algorithms.centrality import (
-    eigenvector,
-    betweenness_centrality,
-    closeness_centrality,
-)
+from networkx.algorithms.centrality import betweenness_centrality
 from networkx.algorithms.cluster import clustering
 import torch
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
-from torch_geometric.data import InMemoryDataset
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from scipy.stats import skew, kurtosis
 
 
 def parse_arguments():
@@ -25,6 +22,13 @@ def parse_arguments():
         type=str,
         default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out\ABIDE_adjacency.npz",
         help="Path to the adjacancy matrix",
+        required=True,
+    )
+    parser.add_argument(
+        "--time_series_path",
+        type=str,
+        default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\competition\out\time_series.npy",
+        help="Path to the time series matrix",
         required=True,
     )
     parser.add_argument(
@@ -48,73 +52,101 @@ def parse_arguments():
         help="Threshold",
         required=False,
     )
+    parser.add_argument(
+        "--data_scaler_type",
+        type=str,
+        default=None,
+        help="Method used for scaling the data. options: ['MinMax', 'Standard']",
+        required=False,
+    )
 
     args = parser.parse_args()
     return args
 
 
-def data_preparation(adj_path, y_path, batch_size=1, threshold=0.6):
-    """Creates Data object of pytorch_geometric using graph features and edge list
+def data_preparation(
+    adj_path, time_series_path, y_path, batch_size=1, threshold=0.2, scaler_type=None
+):
+    """
+    Creates Data object of pytorch_geometric using graph features and edge list
 
-    Parameters
-    ----------
-    adj_path : str
-        path to the adjacancy matrix (.npz)
+    Args:
+        adj_path (str): path to the adjacancy matrix (.npz)
+        time_series_path (str): path to the time_series matrix (.npy)
+        y_path (str): path to the label matrix (.npz)
+        batch_size (int, optional): batch_size used for dataloaders. Defaults to 1.
+        threshold (float, optional): threshold used to remove noisy connections from adj_mat. Defaults to 0.2.
 
-    Returns
-    -------
-    Data Object [torch_geometric.loader.DataLoader]
+    Returns:
+        tuple: train, validation, test dataloaders
     """
 
-    data = np.load(adj_path)
-    adj_mat = data["a"]
-    # print(f"max: {np.max(adj_mat)}")
-    # print(f"min: {np.min(adj_mat)}")
-    # print(f"quantile: {np.min(adj_mat)}")
-    # print(f"shape: {adj_mat.shape}")
+    adj_mat = np.load(adj_path)["a"]
+    time_series_ls = np.load(time_series_path, allow_pickle=True)
+    y_target = np.load(y_path)["a"]
 
-    label = np.load(y_path)
-    y_target = label["a"]
-
-    adj_mat = np.greater_equal(adj_mat, threshold).astype(int)
+    adj_mat[adj_mat <= threshold] = 0
 
     data_list = []
     ## Create a graph using networkx
     for i in range(adj_mat.shape[0]):
-        G = nx.from_numpy_matrix(adj_mat[i])
+
+        G = nx.from_numpy_matrix(adj_mat[i], create_using=nx.Graph)
 
         ## Extract features
+
+        ## dict(G.degree(weight="weight")).values()
+        ## dict(betweenness_centrality(G, weight="weight")).values()
+
         features = pd.DataFrame(
             {
                 "degree": dict(G.degree).values(),
-                "eigen_vector_centrality": dict(nx.eigenvector_centrality(G)).values(),
-                "betweenness": dict(betweenness_centrality(G)).values(),
-                "closeness": dict(closeness_centrality(G)).values(),
-                "clustring_coef": dict(clustering(G)).values(),
+                "betweenness": dict(nx.betweenness_centrality(G)).values(),
+                # "eccentricity": dict(nx.eccentricity(G)).values(),
+                "ts_mean": time_series_ls[i].mean(axis=0),
+                "ts_variance": time_series_ls[i].var(axis=0),
+                "ts_skewness": skew(time_series_ls[i], axis=0),
+                "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
             }
         )
 
-        X = torch.tensor(features.values)
-        edge_index = torch.tensor(list(G.edges()))
+        # scale the data (optional)
+        if scaler_type in ["MinMax", "Standard"]:
+            if scaler_type == "MinMax":
+                scaler = MinMaxScaler()
+                features = scaler.fit_transform(features)
+            else:
+                scaler = StandardScaler()
+                features = scaler.fit_transform(features)
 
-        # print(y_target[i].item())
+            X = torch.from_numpy(features)
+        else:
+            X = torch.tensor(features.values)
+
+        print(X.shape)
+        edge_index = torch.tensor(list(G.edges()))
         data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i].item()))
 
     ## Split Dataset
-    train, test = train_test_split(data_list, test_size=0.33, shuffle=True)
-    val, test = train_test_split(test, test_size=0.5, shuffle=True)
+    train, test = train_test_split(
+        data_list, test_size=0.25, shuffle=True, random_state=42
+    )
 
     train_data_loader = DataLoader(train, batch_size=batch_size)
-    val_data_loader = DataLoader(val, batch_size=batch_size)
     test_data_loader = DataLoader(test, batch_size=batch_size)
 
-    return train_data_loader, val_data_loader, test_data_loader
+    return train_data_loader, test_data_loader
 
 
 def main():
     args = parse_arguments()
-    train_data_loader, val_data_loader, test_data_loader = data_preparation(
-        args.adj_path, args.y_path, args.batch_size
+    train_data_loader, test_data_loader = data_preparation(
+        adj_path=args.adj_path,
+        time_series_path=args.time_series_path,
+        y_path=args.y_path,
+        batch_size=args.batch_size,
+        threshold=args.threshold,
+        scaler_type=args.data_scaler_type,
     )
     for data in train_data_loader:  # every batch
         print(data, data.y)

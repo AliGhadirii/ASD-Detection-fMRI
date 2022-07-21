@@ -1,15 +1,14 @@
 from nilearn.datasets import (
     fetch_abide_pcp,
-    fetch_atlas_basc_multiscale_2015,
     fetch_coords_power_2011,
 )
 import argparse
 from nilearn.connectome import ConnectivityMeasure
-from nilearn.input_data import NiftiLabelsMasker, NiftiSpheresMasker
+from nilearn.input_data import NiftiSpheresMasker
 import numpy as np
 import os
 import pandas as pd
-from sklearn.decomposition import PCA
+from tqdm import tqdm
 
 
 def parse_arguments():
@@ -56,23 +55,22 @@ def load_data(
     # make list of filenames
     fmri_filenames = abide.func_preproc
 
-    """ Previous Atlas
-    # load atlas
-    multiscale = fetch_atlas_basc_multiscale_2015()
-    # print(multiscale)
-    atlas_filename = multiscale.scale064
-    # print(f"atalas file names are: {atlas_filename}")
-    
-    initialize masker object
-    masker = NiftiLabelsMasker(
-        labels_img=atlas_filename, standardize=True, memory="nilearn_cache", verbose=0
-    )
-    """
+    ### Previous Atlas
+
+    # # load atlas
+    # multiscale = fetch_atlas_basc_multiscale_2015()
+    # # print(multiscale)
+    # atlas_filename = multiscale.scale064
+    # # print(f"atalas file names are: {atlas_filename}")
+
+    # initialize masker object
+    # masker = NiftiLabelsMasker(
+    #     labels_img=atlas_filename, standardize=True, memory="nilearn_cache", verbose=0
+    # )
 
     # load power atlas
     power = fetch_coords_power_2011()
     coords = np.vstack((power.rois["x"], power.rois["y"], power.rois["z"])).T
-    print("Stacked power coordinates in array of shape {0}.".format(coords.shape))
 
     # initialize masker object
     # NiftiSpheresMasker is useful when data from given seeds should be extracted.
@@ -81,7 +79,7 @@ def load_data(
         radius=5,  # Indicates, in millimeters, the radius for the sphere around the seed
         standardize=True,  # the signal is z-scored. Timeseries are shifted to zero mean and scaled to unit variance
         memory="nilearn_cache",
-        verbose=2,
+        verbose=0,
     )
 
     # initialize correlation measure
@@ -91,8 +89,10 @@ def load_data(
 
     try:  # check if feature file already exists
         # load features
-        feat_file = os.path.join(output_dir, "ABIDE_adjacency.npz")
+        feat_file = os.path.join(output_dir, f"ABIDE_adjacency_{fc_matrix_kind}.npz")
+        ts_file = os.path.join(output_dir, "ABIDE_time_series.npy")
         correlation_matrices = np.load(feat_file)["a"]
+        time_series_ls = np.load(ts_file, allow_pickle=True)
         print("Feature file found.")
 
     except:  # if not, extract features
@@ -100,30 +100,42 @@ def load_data(
 
         if fc_matrix_kind == "tangent":
             time_series_ls = []
-            for i, sub in enumerate(fmri_filenames):
+            loop = tqdm(enumerate(fmri_filenames), total=len(fmri_filenames))
+            for i, sub in loop:
+
                 # extract the timeseries from the ROIs in the atlas
                 time_series = masker.fit_transform(sub)
-
-                print(f"shape of time series{i}: {time_series.shape}")
                 time_series_ls.append(time_series)
-                print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
-
+                loop.set_description(
+                    f"Extracting Time series for object {i + 1} of {len(fmri_filenames)} "
+                )
             correlation_matrices = correlation_measure.fit_transform(time_series_ls)
 
         else:
             correlation_matrices = []
-            for i, sub in enumerate(fmri_filenames):
+            time_series_ls = []
+            loop = tqdm(enumerate(fmri_filenames), total=len(fmri_filenames))
+            for i, sub in loop:
                 # extract the timeseries from the ROIs in the atlas
                 time_series = masker.fit_transform(sub)
                 # create a region x region correlation matrix
                 correlation_matrix = correlation_measure.fit_transform([time_series])[0]
-                # add to our container
-                correlation_matrices.append(correlation_matrix)
 
-                print("finished extracting %s of %s" % (i + 1, len(fmri_filenames)))
+                time_series_ls.append(time_series)
+                correlation_matrices.append(correlation_matrix)
+                loop.set_description(
+                    f"Extracting Time series for object {i + 1} of {len(fmri_filenames)} "
+                )
 
         np.savez_compressed(
-            os.path.join(output_dir, "ABIDE_adjacency"), a=correlation_matrices
+            os.path.join(output_dir, f"ABIDE_adjacency_{fc_matrix_kind}"),
+            a=correlation_matrices,
+            dtype=object,
+        )
+        np.save(
+            file=os.path.join(output_dir, "ABIDE_time_series.npy"),
+            arr=time_series_ls,
+            allow_pickle=True,
         )
         correlation_matrices = np.array(correlation_matrices)
 
@@ -133,17 +145,34 @@ def load_data(
     y_target = y_target.apply(lambda x: x - 1)
     np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
 
-    return correlation_matrices, y_target
+    return correlation_matrices, time_series_ls, y_target
 
 
 def run():
     args = parse_arguments()
-    adj_mat, y_target = load_data(
+    correlation_matrices, time_series_ls, y_target = load_data(
         args.input_path, args.output_path, args.fc_matrix_kind
     )
-    print(adj_mat.shape)
-    print("****************************")
-    print(y_target.shape)
+    print(f"correlation_matrices shape: {correlation_matrices.shape}")
+    print(f"time_series_ls len: {len(time_series_ls)}")
+    print(f"y_target shape: {y_target.shape}")
+
+    df = pd.DataFrame(columns=["mean", "std", "min", "0.25", "0.5", "0.75", "max"])
+    for arr in correlation_matrices:
+        df = df.append(
+            {
+                "mean": np.mean(arr),
+                "std": np.std(arr),
+                "min": np.min(arr),
+                "0.25": np.percentile(arr, 25),
+                "0.5": np.percentile(arr, 50),
+                "0.75": np.percentile(arr, 75),
+                "max": np.max(arr),
+            },
+            ignore_index=True,
+        )
+    print(df)
+    print(df.describe())
 
 
 if __name__ == "__main__":
