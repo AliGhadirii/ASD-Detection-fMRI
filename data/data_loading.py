@@ -19,20 +19,20 @@ def parse_arguments():
         "--input_path",
         type=str,
         default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Data",
-        help="Path to the data directory",
+        help="Path where data should be downloaded or be loaded",
         required=True,
     )
     parser.add_argument(
         "--output_path",
         type=str,
         default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\Code\Out",
-        help="Path to the output file",
+        help="Path to the output files",
         required=True,
     )
     parser.add_argument(
         "--fc_matrix_kind",
         type=str,
-        default="correlation",
+        default="tangent",
         help="different kinds of functional connectivity matrices : covariance, correlation, partial correlation, tangent, precision",
         required=False,
     )
@@ -47,7 +47,6 @@ def load_data(
     print("Loading dataset...")
     abide = fetch_abide_pcp(
         data_dir=data_dir,
-        SITE_ID=["CMU"],
         pipeline=pipeline,
         quality_checked=quality_checked,
     )
