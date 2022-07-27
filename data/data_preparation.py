@@ -65,7 +65,13 @@ def parse_arguments():
 
 
 def data_preparation(
-    adj_path, time_series_path, y_path, batch_size=1, threshold=0.2, scaler_type=None
+    adj_path,
+    time_series_path,
+    y_path,
+    batch_size=1,
+    threshold=0.2,
+    scaler_type=None,
+    CV=False,
 ):
     """
     Creates Data object of pytorch_geometric using graph features and edge list
@@ -102,7 +108,7 @@ def data_preparation(
             {
                 "degree": dict(G.degree).values(),
                 "betweenness": dict(nx.betweenness_centrality(G)).values(),
-                # "eccentricity": dict(nx.eccentricity(G)).values(),
+                "eccentricity": dict(nx.eccentricity(G)).values(),
                 "ts_mean": time_series_ls[i].mean(axis=0),
                 "ts_variance": time_series_ls[i].var(axis=0),
                 "ts_skewness": skew(time_series_ls[i], axis=0),
@@ -123,19 +129,31 @@ def data_preparation(
         else:
             X = torch.tensor(features.values)
 
-        print(X.shape)
         edge_index = torch.tensor(list(G.edges()))
         data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i].item()))
 
-    ## Split Dataset
-    train, test = train_test_split(
-        data_list, test_size=0.25, shuffle=True, random_state=42
-    )
+    if CV:
+        ## Split Dataset for CV
+        train, test = train_test_split(
+            data_list, test_size=0.25, shuffle=True, random_state=42
+        )
 
-    train_data_loader = DataLoader(train, batch_size=batch_size)
-    test_data_loader = DataLoader(test, batch_size=batch_size)
+        train_data_loader = DataLoader(train, batch_size=batch_size)
+        test_data_loader = DataLoader(test, batch_size=batch_size)
 
-    return train_data_loader, test_data_loader
+        return train_data_loader, test_data_loader
+    else:
+        ## Split Dataset for CV
+        train, test = train_test_split(
+            data_list, test_size=0.2, shuffle=True, random_state=42
+        )
+        val, test = train_test_split(test, test_size=0.1, shuffle=True, random_state=42)
+
+        train_data_loader = DataLoader(train, batch_size=batch_size)
+        val_data_loader = DataLoader(val, batch_size=batch_size)
+        test_data_loader = DataLoader(test, batch_size=batch_size)
+
+        return train_data_loader, val_data_loader, test_data_loader
 
 
 def main():
