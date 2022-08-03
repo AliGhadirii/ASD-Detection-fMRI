@@ -3,6 +3,9 @@ import os
 from tqdm import tqdm
 import torch
 import pandas as pd
+from torch_geometric.loader import DataLoader
+from sklearn.model_selection import train_test_split
+import pickle
 
 from models.GATv2 import GATv2
 from data.data_preparation import data_preparation
@@ -14,24 +17,10 @@ def parse_arguments():
         description="Arguments for training the Inception_v3 model"
     )
     parser.add_argument(
-        "--adj_path",
+        "--features_path",
         type=str,
         default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\competition\out\train_adjacency_tangent.npz",
-        help="Path to the adjacancy matrix",
-        required=True,
-    )
-    parser.add_argument(
-        "--time_series_path",
-        type=str,
-        default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\competition\out\time_series.npz",
-        help="Path to the time series matrix",
-        required=True,
-    )
-    parser.add_argument(
-        "--y_path",
-        type=str,
-        default=r"C:\Users\Afrooz Sheikholeslam\Education\8th semester\Project1\competition\out\Y_target.npz",
-        help="Path to the y target",
+        help="Path to the features file",
         required=True,
     )
     parser.add_argument(
@@ -82,24 +71,10 @@ def parse_arguments():
         required=False,
     )
     parser.add_argument(
-        "--threshold",
-        type=float,
-        default=0.2,
-        help="threshold use in data preprocessing section",
-        required=False,
-    )
-    parser.add_argument(
         "--dropout_rate",
         type=float,
         default=0,
         help="dropout rate used before linear classifier",
-        required=False,
-    )
-    parser.add_argument(
-        "--data_scaler_type",
-        type=str,
-        default="Standard",
-        help="Method used for scaling the data. options: ['MinMax', 'Standard']",
         required=False,
     )
     args = parser.parse_args()
@@ -164,15 +139,15 @@ def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Used Device is : {}".format(device))
 
-    train_loader, val_loader, test_loader = data_preparation(
-        adj_path=args.adj_path,
-        time_series_path=args.time_series_path,
-        y_path=args.y_path,
-        batch_size=args.batch_size,
-        threshold=args.threshold,
-        scaler_type=args.data_scaler_type,
-        CV=False,
+    with open(args.features_path, "rb") as fp:
+        data_list = pickle.load(fp)
+
+    train_data, val_data = train_test_split(
+        data_list, test_size=0.2, shuffle=True, random_state=42
     )
+
+    train_loader = DataLoader(train_data, batch_size=args.batch_size)
+    val_loader = DataLoader(val_data, batch_size=args.batch_size)
 
     model = GATv2(
         input_feat_dim=next(iter(train_loader)).x.shape[1],
@@ -258,9 +233,11 @@ def main(args):
     print(f"Best Validation Loss was : {best_val_loss:.4f}")
     print(f"Best Validation accuracy was : {100 * best_metrics['acc']:.2f}")
 
-    plot_loss(train_losses, val_losses)
+    plot_loss(train_losses=train_losses, val_losses=val_losses, save_path=args.results)
     label_names = ["0", "1"]
-    plot_confusion_matrix(cm=best_metrics["cm"], classes=label_names)
+    plot_confusion_matrix(
+        cm=best_metrics["cm"], classes=label_names, save_path=args.results
+    )
 
 
 if __name__ == "__main__":

@@ -158,18 +158,22 @@ def run():
 
     df = pd.DataFrame(columns=["mean", "std", "min", "0.25", "0.5", "0.75", "max"])
     for arr in correlation_matrices:
-        df = df.append(
-            {
-                "mean": np.mean(arr),
-                "std": np.std(arr),
-                "min": np.min(arr),
-                "0.25": np.percentile(arr, 25),
-                "0.5": np.percentile(arr, 50),
-                "0.75": np.percentile(arr, 75),
-                "max": np.max(arr),
-            },
-            ignore_index=True,
+        df2 = pd.DataFrame.from_dict(
+            [
+                {
+                    "mean": np.mean(arr),
+                    "std": np.std(arr),
+                    "min": np.min(arr),
+                    "0.25": np.percentile(arr, 25),
+                    "0.5": np.percentile(arr, 50),
+                    "0.75": np.percentile(arr, 75),
+                    "max": np.max(arr),
+                }
+            ]
         )
+
+        df = pd.concat([df, df2], ignore_index=True, axis=0)
+
     print(df)
     print(df.describe())
 

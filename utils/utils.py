@@ -1,4 +1,5 @@
 import torch
+import os
 from torchmetrics import Accuracy, F1Score, Precision, Recall
 from prettytable import PrettyTable
 import matplotlib.pyplot as plt
@@ -42,7 +43,7 @@ def count_parameters(model):
     return total_params
 
 
-def plot_loss(train_losses, val_losses):
+def plot_loss(train_losses, val_losses, save_path):
 
     plt.plot(train_losses, "b", label="train_loss")
     plt.plot(val_losses, "r", label="val_loss")
@@ -50,11 +51,12 @@ def plot_loss(train_losses, val_losses):
     plt.ylabel("Loss")
     plt.legend(loc="upper right")
     plt.title("Traing and Validation losses curve")
+    plt.savefig(os.path.join(save_path, "loss.png"))
     plt.show()
 
 
 def plot_confusion_matrix(
-    cm, classes, normalize=False, title="Confusion matrix", cmap=plt.cm.Blues
+    cm, classes, save_path, normalize=False, title="Confusion matrix", cmap=plt.cm.Blues
 ):
 
     plt.imshow(cm, interpolation="nearest", cmap=cmap, aspect="auto")
@@ -85,4 +87,5 @@ def plot_confusion_matrix(
     plt.tight_layout()
     plt.ylabel("True label")
     plt.xlabel("Predicted label")
+    plt.savefig(os.path.join(save_path, "cm.png"))
     plt.show()
