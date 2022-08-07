@@ -1,32 +1,30 @@
 import torch
 import os
-from torchmetrics import Accuracy, F1Score, Precision, Recall
+from sklearn import metrics
 from prettytable import PrettyTable
 import matplotlib.pyplot as plt
 import itertools
 import numpy as np
-from sklearn.metrics import confusion_matrix
 
 
-def get_metrics(y_pred, y_true):
+def get_metrics(logits, y_true, last_activation):
 
-    y_pred = torch.sigmoid(y_pred)
+    if last_activation == "sigmoid":
+        y_pred = torch.sigmoid(logits)
+        y_pred = (y_pred >= 0.5).int()
+    else:
+        y_pred = torch.softmax(logits, dim=-1)
+        y_pred = torch.argmax(y_pred, dim=-1)
 
-    metrics = {}
-    acc = Accuracy(average="micro")
-    f1 = F1Score(average="micro")
-    precision = Precision(average="micro")
-    recall = Recall(average="micro")
+    metrics_dict = {}
 
-    metrics["acc"] = acc(y_pred, y_true)
-    metrics["f1"] = f1(y_pred, y_true)
-    metrics["precision"] = precision(y_pred, y_true)
-    metrics["recall"] = recall(y_pred, y_true)
+    metrics_dict["acc"] = metrics.accuracy_score(y_pred, y_true)
+    metrics_dict["f1"] = metrics.f1_score(y_pred, y_true)
+    metrics_dict["precision"] = metrics.precision_score(y_pred, y_true)
+    metrics_dict["recall"] = metrics.recall_score(y_pred, y_true)
+    metrics_dict["cm"] = metrics.confusion_matrix(y_true=y_true, y_pred=y_pred)
 
-    y_pred_int = (y_pred >= 0.5).int()
-    metrics["cm"] = confusion_matrix(y_true=y_true, y_pred=y_pred_int)
-
-    return metrics
+    return metrics_dict
 
 
 def count_parameters(model):

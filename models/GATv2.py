@@ -11,16 +11,19 @@ class GATv2(torch.nn.Module):
         input_feat_dim,
         dim_shapes,
         heads,
-        num_classes,
         dropout_rate=None,
-        last_sigmoid=False,
+        last_activation="sigmoid",
     ):
 
         super(GATv2, self).__init__()
         self.num_layers = len(dim_shapes)
-        self.last_sigmoid = last_sigmoid
+        self.last_activation = last_activation
         self.dropout_rate = dropout_rate
         self.linear = None
+        if self.last_activation == "sigmoid":
+            self.num_class = 1
+        else:
+            self.num_class = 2
 
         assert (
             self.num_layers >= 1
@@ -45,7 +48,7 @@ class GATv2(torch.nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(heads * dim_shapes[-1][1], 16),
             nn.ReLU(),
-            nn.Linear(16, num_classes),
+            nn.Linear(16, self.num_class),
         )
 
     def forward(self, batched_data):
@@ -66,9 +69,6 @@ class GATv2(torch.nn.Module):
         if self.dropout_rate is not None:
             x = F.dropout(x, p=self.dropout_rate)
         x = self.classifier(x)
-
-        if self.last_sigmoid:
-            return torch.sigmoid(x)
 
         return x
 
