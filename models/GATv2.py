@@ -36,19 +36,29 @@ class GATv2(torch.nn.Module):
         for l in range(self.num_layers):
             if l == 0:
                 self.convs.append(
-                    GATv2Conv(dim_shapes[l][0], dim_shapes[l][1], heads=heads)
+                    GATv2Conv(
+                        dim_shapes[l][0],
+                        dim_shapes[l][1],
+                        heads=heads,
+                        dropout=self.dropout_rate,
+                    )
                 )
             else:
                 self.convs.append(
-                    GATv2Conv(dim_shapes[l][0] * heads, dim_shapes[l][1], heads=heads)
+                    GATv2Conv(
+                        dim_shapes[l][0] * heads,
+                        dim_shapes[l][1],
+                        heads=heads,
+                        dropout=self.dropout_rate,
+                    )
                 )
 
         self.pooling = global_mean_pool
 
         self.classifier = nn.Sequential(
-            nn.Linear(heads * dim_shapes[-1][1], 16),
+            nn.Linear(heads * dim_shapes[-1][1], 8),
             nn.ReLU(),
-            nn.Linear(16, self.num_class),
+            nn.Linear(8, self.num_class),
         )
 
     def forward(self, batched_data):
@@ -66,8 +76,6 @@ class GATv2(torch.nn.Module):
             x = F.relu(self.convs[l](x.float(), edge_index))
 
         x = self.pooling(x, batch)
-        if self.dropout_rate is not None:
-            x = F.dropout(x, p=self.dropout_rate)
         x = self.classifier(x)
 
         return x

@@ -6,6 +6,7 @@ import pandas as pd
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 import pickle
+import torchinfo
 
 from models.GATv2 import GATv2
 from data.data_preparation import data_preparation
@@ -73,7 +74,7 @@ def parse_arguments():
     parser.add_argument(
         "--dropout_rate",
         type=float,
-        default=0,
+        default=0.0,
         help="dropout rate used before linear classifier",
         required=False,
     )
@@ -95,7 +96,6 @@ def train(model, device, batch, optimizer, loss_fn):
     batch = batch.to(device)
     optimizer.zero_grad()
     logits = model(batch)
-
     if model.last_activation == "sigmoid":
         loss = loss_fn(logits.squeeze(), batch.y.float())
     else:
@@ -173,7 +173,7 @@ def main(args):
 
     model = GATv2(
         input_feat_dim=next(iter(train_loader)).x.shape[1],
-        dim_shapes=[(128, 64), (64, 64), (64, 32)],
+        dim_shapes=[(7, 8), (8, 16), (16, 16)],
         heads=args.heads,
         dropout_rate=args.dropout_rate,
         last_activation=args.last_activation,
