@@ -168,12 +168,12 @@ def main(args):
         data_list, test_size=0.2, shuffle=True, random_state=42
     )
 
-    train_loader = DataLoader(train_data, batch_size=args.batch_size)
+    train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=args.batch_size)
 
     model = GATv2(
         input_feat_dim=next(iter(train_loader)).x.shape[1],
-        dim_shapes=[(7, 8), (8, 16), (16, 16)],
+        dim_shapes=[(5, 8), (8, 16), (16, 16)],
         heads=args.heads,
         dropout_rate=args.dropout_rate,
         last_activation=args.last_activation,

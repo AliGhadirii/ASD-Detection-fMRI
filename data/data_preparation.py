@@ -96,107 +96,156 @@ def data_preparation(
         tuple: train, validation, test dataloaders
     """
 
-    adj_mat = np.load(adj_path)["a"]
-    time_series_ls = np.load(time_series_path, allow_pickle=True)
-    y_target = np.load(y_path)["a"]
-
-    if adj_mat_type not in ["Weighted", "weighted_threshold", "binary_threshold"]:
-        raise RuntimeError(
-            "adj_mat_type should be one of these: ['Weighted', 'weighted_threshold', 'binary_threshold']"
-        )
-    else:
-        if adj_mat_type == "weighted_threshold":
-            adj_mat[adj_mat <= threshold] = 0
-        elif adj_mat_type == "binary_threshold":
-            adj_mat[adj_mat <= threshold] = 0
-            adj_mat[adj_mat >= threshold] = 1
-        else:
-            pass
-
-    data_list = []
-    ## Create a graph using networkx
-    loop = tqdm(range(adj_mat.shape[0]), total=adj_mat.shape[0])
-    for i in loop:
-
-        loop.set_description(
-            f"Extracting features of object {i} of {adj_mat.shape[0]} "
-        )
-
-        G = nx.from_numpy_matrix(adj_mat[i], create_using=nx.Graph)
-
-        ## Extract features
-
-        ## dict(G.degree(weight="weight")).values()
-        ## dict(betweenness_centrality(G, weight="weight")).values()
-        if nx.is_connected(G):
-
-            features = pd.DataFrame(
-                {
-                    "degree": dict(G.degree(weight="weight")).values(),
-                    "betweenness": dict(
-                        betweenness_centrality(G, weight="weight")
-                    ).values(),
-                    "eccentricity": dict(nx.eccentricity(G)).values(),
-                    "ts_mean": time_series_ls[i].mean(axis=0),
-                    "ts_variance": time_series_ls[i].var(axis=0),
-                    "ts_skewness": skew(time_series_ls[i], axis=0),
-                    "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
-                }
-            )
-        else:
-            eccentricity = {}
-            components = sorted(nx.connected_components(G), key=len, reverse=True)
-            for comp in components:
-                G_sub = G.subgraph(comp)
-                for node in comp:
-                    eccentricity[node] = nx.eccentricity(G_sub, v=node)
-
-            features = pd.DataFrame(
-                {
-                    "degree": dict(G.degree(weight="weight")).values(),
-                    "betweenness": dict(
-                        betweenness_centrality(G, weight="weight")
-                    ).values(),
-                    "eccentricity": eccentricity.values(),
-                    "ts_mean": time_series_ls[i].mean(axis=0),
-                    "ts_variance": time_series_ls[i].var(axis=0),
-                    "ts_skewness": skew(time_series_ls[i], axis=0),
-                    "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
-                }
-            )
-
-        # scale the data (optional)
-        if scaler_type in ["MinMax", "Standard"]:
-            if scaler_type == "MinMax":
-                scaler = MinMaxScaler()
-                features = scaler.fit_transform(features)
-            else:
-                scaler = StandardScaler()
-                features = scaler.fit_transform(features)
-
-            X = torch.from_numpy(features)
-        else:
-            X = torch.tensor(features.values)
-
-        edge_index = torch.tensor(list(G.edges()))
-        data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i].item()))
-
-    # save features
-    idx1 = adj_path.rfind('_') + 1
-    idx2 = adj_path.rfind('.')
+    idx1 = adj_path.rfind("_") + 1
+    idx2 = adj_path.rfind(".")
     fc_matrix_kind = adj_path[idx1:idx2]
     filename = (
         f"features_{fc_matrix_kind}_{adj_mat_type}_{str(threshold)}_{scaler_type}"
     )
-    path = os.path.join(output_path, filename)
-    with open(path, "wb") as fp:
-        pickle.dump(data_list, fp)
-    print(f"Features are successfully extracted and stored in: {path}")
+
+    try:  # check if feature file already exists
+
+        # load features
+        feat_file = os.path.join(output_path, filename)
+
+        with open(feat_file, "rb") as fp:
+            data_list = pickle.load(fp)
+
+        print("Feature file found.")
+
+        normal_dfs = []
+        ASD_dfs = []
+
+        for subject in data_list:
+            if subject.y == 0:
+                df = pd.DataFrame(
+                    data=subject.x.numpy(),
+                    columns=[
+                        "degree",
+                        "betweenness",
+                        "eccentricity",
+                        # "ts_mean",
+                        # "ts_variance",
+                        "ts_skewness",
+                        "ts_kurtosis",
+                    ],
+                )
+                normal_dfs.append(df)
+            else:
+                df = pd.DataFrame(
+                    data=subject.x.numpy(),
+                    columns=[
+                        "degree",
+                        "betweenness",
+                        "eccentricity",
+                        # "ts_mean",
+                        # "ts_variance",
+                        "ts_skewness",
+                        "ts_kurtosis",
+                    ],
+                )
+                ASD_dfs.append(df)
+        return normal_dfs, ASD_dfs
+
+    except:  # if not, extract features
+        print("No feature file found. Extracting features...")
+        adj_mat = np.load(adj_path)["a"]
+        time_series_ls = np.load(time_series_path, allow_pickle=True)
+        y_target = np.load(y_path)["a"]
+
+        if adj_mat_type not in ["Weighted", "weighted_threshold", "binary_threshold"]:
+            raise RuntimeError(
+                "adj_mat_type should be one of these: ['Weighted', 'weighted_threshold', 'binary_threshold']"
+            )
+        else:
+            if adj_mat_type == "weighted_threshold":
+                adj_mat[adj_mat <= threshold] = 0
+            elif adj_mat_type == "binary_threshold":
+                adj_mat[adj_mat <= threshold] = 0
+                adj_mat[adj_mat >= threshold] = 1
+            else:
+                pass
+
+        data_list = []
+        ## Create a graph using networkx
+        loop = tqdm(range(adj_mat.shape[0]), total=adj_mat.shape[0])
+        for i in loop:
+
+            loop.set_description(
+                f"Extracting features of object {i} of {adj_mat.shape[0]} "
+            )
+
+            G = nx.from_numpy_matrix(adj_mat[i], create_using=nx.Graph)
+
+            ## Extract features
+
+            ## dict(G.degree(weight="weight")).values()
+            ## dict(betweenness_centrality(G, weight="weight")).values()
+            if nx.is_connected(G):
+
+                features = pd.DataFrame(
+                    {
+                        "degree": dict(G.degree(weight="weight")).values(),
+                        "betweenness": dict(
+                            betweenness_centrality(G, weight="weight")
+                        ).values(),
+                        "eccentricity": dict(nx.eccentricity(G)).values(),
+                        # "ts_mean": time_series_ls[i].mean(axis=0),
+                        # "ts_variance": time_series_ls[i].var(axis=0),
+                        "ts_skewness": skew(time_series_ls[i], axis=0),
+                        "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
+                    }
+                )
+            else:
+                eccentricity = {}
+                components = sorted(nx.connected_components(G), key=len, reverse=True)
+                for comp in components:
+                    G_sub = G.subgraph(comp)
+                    for node in comp:
+                        eccentricity[node] = nx.eccentricity(G_sub, v=node)
+
+                features = pd.DataFrame(
+                    {
+                        "degree": dict(G.degree(weight="weight")).values(),
+                        "betweenness": dict(
+                            betweenness_centrality(G, weight="weight")
+                        ).values(),
+                        "eccentricity": eccentricity.values(),
+                        # "ts_mean": time_series_ls[i].mean(axis=0),
+                        # "ts_variance": time_series_ls[i].var(axis=0),
+                        "ts_skewness": skew(time_series_ls[i], axis=0),
+                        "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
+                    }
+                )
+
+            # scale the data (optional)
+            if scaler_type in ["MinMax", "Standard"]:
+                if scaler_type == "MinMax":
+                    scaler = MinMaxScaler()
+                    features = scaler.fit_transform(features)
+                else:
+                    scaler = StandardScaler()
+                    features = scaler.fit_transform(features)
+
+                X = torch.from_numpy(features)
+            else:
+                X = torch.tensor(features.values)
+
+            edge_index = torch.tensor(list(G.edges()))
+            data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i].item()))
+
+        # save features
+
+        path = os.path.join(output_path, filename)
+        with open(path, "wb") as fp:
+            pickle.dump(data_list, fp)
+        print(f"Features are successfully extracted and stored in: {path}")
 
 
 def main():
     args = parse_arguments()
-    data_preparation(
+
+    normal_dfs, ASD_dfs = data_preparation(
         adj_path=args.adj_path,
         time_series_path=args.time_series_path,
         y_path=args.y_path,
@@ -205,6 +254,12 @@ def main():
         threshold=args.threshold,
         scaler_type=args.data_scaler_type,
     )
+
+    print("Normal subject:")
+    print(normal_dfs[36].describe())
+    print()
+    print("Subject with ASD:")
+    print(ASD_dfs[36].describe())
 
 
 if __name__ == "__main__":

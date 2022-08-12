@@ -19,9 +19,9 @@ def get_metrics(logits, y_true, last_activation):
     metrics_dict = {}
 
     metrics_dict["acc"] = metrics.accuracy_score(y_pred, y_true)
-    metrics_dict["f1"] = metrics.f1_score(y_pred, y_true)
-    metrics_dict["precision"] = metrics.precision_score(y_pred, y_true)
-    metrics_dict["recall"] = metrics.recall_score(y_pred, y_true)
+    metrics_dict["f1"] = metrics.f1_score(y_pred, y_true, zero_division=0)
+    metrics_dict["precision"] = metrics.precision_score(y_pred, y_true, zero_division=0)
+    metrics_dict["recall"] = metrics.recall_score(y_pred, y_true, zero_division=0)
     metrics_dict["cm"] = metrics.confusion_matrix(y_true=y_true, y_pred=y_pred)
 
     return metrics_dict
