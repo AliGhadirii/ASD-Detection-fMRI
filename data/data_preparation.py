@@ -234,12 +234,46 @@ def data_preparation(
             edge_index = torch.tensor(list(G.edges()))
             data_list.append(Data(x=X, edge_index=edge_index.T, y=y_target[i].item()))
 
-        # save features
+        normal_dfs = []
+        ASD_dfs = []
 
+        for subject in data_list:
+            if subject.y == 0:
+                df = pd.DataFrame(
+                    data=subject.x.numpy(),
+                    columns=[
+                        "degree",
+                        "betweenness",
+                        "eccentricity",
+                        # "ts_mean",
+                        # "ts_variance",
+                        "ts_skewness",
+                        "ts_kurtosis",
+                    ],
+                )
+                normal_dfs.append(df)
+            else:
+                df = pd.DataFrame(
+                    data=subject.x.numpy(),
+                    columns=[
+                        "degree",
+                        "betweenness",
+                        "eccentricity",
+                        # "ts_mean",
+                        # "ts_variance",
+                        "ts_skewness",
+                        "ts_kurtosis",
+                    ],
+                )
+                ASD_dfs.append(df)
+
+        # save features
         path = os.path.join(output_path, filename)
         with open(path, "wb") as fp:
             pickle.dump(data_list, fp)
         print(f"Features are successfully extracted and stored in: {path}")
+
+        return normal_dfs, ASD_dfs
 
 
 def main():

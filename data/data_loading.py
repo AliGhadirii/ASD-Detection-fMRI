@@ -43,59 +43,65 @@ def parse_arguments():
 def load_data(
     data_dir, output_dir, fc_matrix_kind, pipeline="cpac", quality_checked=True
 ):
-    # get dataset
-    print("Loading dataset...")
-    abide = fetch_abide_pcp(
-        data_dir=data_dir,
-        pipeline=pipeline,
-        quality_checked=quality_checked,
-    )
-
-    # make list of filenames
-    fmri_filenames = abide.func_preproc
-
-    ### Previous Atlas
-
-    # # load atlas
-    # multiscale = fetch_atlas_basc_multiscale_2015()
-    # # print(multiscale)
-    # atlas_filename = multiscale.scale064
-    # # print(f"atalas file names are: {atlas_filename}")
-
-    # initialize masker object
-    # masker = NiftiLabelsMasker(
-    #     labels_img=atlas_filename, standardize=True, memory="nilearn_cache", verbose=0
-    # )
-
-    # load power atlas
-    power = fetch_coords_power_2011()
-    coords = np.vstack((power.rois["x"], power.rois["y"], power.rois["z"])).T
-
-    # initialize masker object
-    # NiftiSpheresMasker is useful when data from given seeds should be extracted.
-    masker = NiftiSpheresMasker(
-        seeds=coords,
-        radius=5,  # Indicates, in millimeters, the radius for the sphere around the seed
-        standardize=True,  # the signal is z-scored. Timeseries are shifted to zero mean and scaled to unit variance
-        memory="nilearn_cache",
-        verbose=0,
-    )
-
-    # initialize correlation measure
-    correlation_measure = ConnectivityMeasure(
-        kind=fc_matrix_kind, vectorize=False, discard_diagonal=True
-    )
 
     try:  # check if feature file already exists
         # load features
         feat_file = os.path.join(output_dir, f"ABIDE_adjacency_{fc_matrix_kind}.npz")
         ts_file = os.path.join(output_dir, "ABIDE_time_series.npy")
+        label_file = os.path.join(output_dir, "Y_target.npz")
+
         correlation_matrices = np.load(feat_file)["a"]
         time_series_ls = np.load(ts_file, allow_pickle=True)
+        y_target = np.load(label_file)["a"]
         print("Feature file found.")
+
+        return correlation_matrices, time_series_ls, y_target
 
     except:  # if not, extract features
         print("No feature file found. Extracting features...")
+
+        # get dataset
+        print("Loading dataset...")
+        abide = fetch_abide_pcp(
+            data_dir=data_dir,
+            pipeline=pipeline,
+            quality_checked=quality_checked,
+        )
+
+        # make list of filenames
+        fmri_filenames = abide.func_preproc
+
+        ### Previous Atlas
+
+        # # load atlas
+        # multiscale = fetch_atlas_basc_multiscale_2015()
+        # # print(multiscale)
+        # atlas_filename = multiscale.scale064
+        # # print(f"atalas file names are: {atlas_filename}")
+
+        # initialize masker object
+        # masker = NiftiLabelsMasker(
+        #     labels_img=atlas_filename, standardize=True, memory="nilearn_cache", verbose=0
+        # )
+
+        # load power atlas
+        power = fetch_coords_power_2011()
+        coords = np.vstack((power.rois["x"], power.rois["y"], power.rois["z"])).T
+
+        # initialize masker object
+        # NiftiSpheresMasker is useful when data from given seeds should be extracted.
+        masker = NiftiSpheresMasker(
+            seeds=coords,
+            radius=5,  # Indicates, in millimeters, the radius for the sphere around the seed
+            standardize=True,  # the signal is z-scored. Timeseries are shifted to zero mean and scaled to unit variance
+            memory="nilearn_cache",
+            verbose=0,
+        )
+
+        # initialize correlation measure
+        correlation_measure = ConnectivityMeasure(
+            kind=fc_matrix_kind, vectorize=False, discard_diagonal=True
+        )
 
         if fc_matrix_kind == "tangent":
             time_series_ls = []
@@ -138,13 +144,13 @@ def load_data(
         )
         correlation_matrices = np.array(correlation_matrices)
 
-    # Get the target vector
-    abide_pheno = pd.DataFrame(abide.phenotypic)
-    y_target = abide_pheno["DX_GROUP"]
-    y_target = y_target.apply(lambda x: x - 1)
-    np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
+        # Get the target vector
+        abide_pheno = pd.DataFrame(abide.phenotypic)
+        y_target = abide_pheno["DX_GROUP"]
+        y_target = y_target.apply(lambda x: x - 1)
+        np.savez_compressed(os.path.join(output_dir, "Y_target"), a=y_target)
 
-    return correlation_matrices, time_series_ls, y_target
+        return correlation_matrices, time_series_ls, y_target
 
 
 def run():
@@ -156,7 +162,9 @@ def run():
     print(f"time_series_ls len: {len(time_series_ls)}")
     print(f"y_target shape: {y_target.shape}")
 
-    df = pd.DataFrame(columns=["mean", "std", "min", "0.25", "0.5", "0.75", "max"])
+    df = pd.DataFrame(
+        columns=["mean", "std", "min", "0.25", "0.5", "0.75", "0.9", "max"]
+    )
     for arr in correlation_matrices:
         df2 = pd.DataFrame.from_dict(
             [
@@ -167,6 +175,7 @@ def run():
                     "0.25": np.percentile(arr, 25),
                     "0.5": np.percentile(arr, 50),
                     "0.75": np.percentile(arr, 75),
+                    "0.9": np.percentile(arr, 90),
                     "max": np.max(arr),
                 }
             ]

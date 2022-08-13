@@ -173,7 +173,8 @@ def main(args):
 
     model = GATv2(
         input_feat_dim=next(iter(train_loader)).x.shape[1],
-        dim_shapes=[(5, 8), (8, 16), (16, 16)],
+        conv_shapes=[(5, 8), (8, 16), (16, 16)],
+        cls_shapes=[8],
         heads=args.heads,
         dropout_rate=args.dropout_rate,
         last_activation=args.last_activation,
@@ -181,6 +182,7 @@ def main(args):
 
     if args.weights_path is not None:
         model.load_weights(args.weights_path)
+        print("Model weights loaded from the given path")
 
     count_parameters(model)
 

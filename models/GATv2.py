@@ -9,14 +9,15 @@ class GATv2(torch.nn.Module):
     def __init__(
         self,
         input_feat_dim,
-        dim_shapes,
+        conv_shapes,
+        cls_shapes,
         heads,
         dropout_rate=None,
         last_activation="sigmoid",
     ):
 
         super(GATv2, self).__init__()
-        self.num_layers = len(dim_shapes)
+        self.num_layers = len(conv_shapes)
         self.last_activation = last_activation
         self.dropout_rate = dropout_rate
         self.linear = None
@@ -29,16 +30,16 @@ class GATv2(torch.nn.Module):
             self.num_layers >= 1
         ), "Number of layers should be more than or equal to 1"
 
-        if input_feat_dim != dim_shapes[0][0]:
-            self.linear = nn.Linear(input_feat_dim, dim_shapes[0][0])
+        if input_feat_dim != conv_shapes[0][0]:
+            self.linear = nn.Linear(input_feat_dim, conv_shapes[0][0])
 
         self.convs = nn.ModuleList()
         for l in range(self.num_layers):
             if l == 0:
                 self.convs.append(
                     GATv2Conv(
-                        dim_shapes[l][0],
-                        dim_shapes[l][1],
+                        conv_shapes[l][0],
+                        conv_shapes[l][1],
                         heads=heads,
                         dropout=self.dropout_rate,
                     )
@@ -46,8 +47,8 @@ class GATv2(torch.nn.Module):
             else:
                 self.convs.append(
                     GATv2Conv(
-                        dim_shapes[l][0] * heads,
-                        dim_shapes[l][1],
+                        conv_shapes[l][0] * heads,
+                        conv_shapes[l][1],
                         heads=heads,
                         dropout=self.dropout_rate,
                     )
@@ -55,11 +56,16 @@ class GATv2(torch.nn.Module):
 
         self.pooling = global_mean_pool
 
-        self.classifier = nn.Sequential(
-            nn.Linear(heads * dim_shapes[-1][1], 8),
-            nn.ReLU(),
-            nn.Linear(8, self.num_class),
-        )
+        self.classifier = nn.Sequential()
+        for idx, dim in enumerate(cls_shapes):
+            if idx == 0:
+                self.classifier.append(nn.Linear(heads * conv_shapes[-1][1], dim))
+                self.classifier.append(nn.ReLU())
+            else:
+                self.classifier.append(nn.Linear(cls_shapes[idx - 1], dim))
+                self.classifier.append(nn.ReLU())
+
+        self.classifier.append(nn.Linear(cls_shapes[-1], self.num_class))
 
     def forward(self, batched_data):
 
