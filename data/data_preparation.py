@@ -69,6 +69,14 @@ def parse_arguments():
         help="Method used for scaling the data. options: ['MinMax', 'Standard']",
         required=False,
     )
+    parser.add_argument(
+        "--loop_removal",
+        type=str,
+        default="True",
+        choices=("True", "False"),
+        help="If true, then the loops will be removed",
+        required=False,
+    )
 
     args = parser.parse_args()
     return args
@@ -82,6 +90,7 @@ def data_preparation(
     adj_mat_type="weighted_threshold",
     threshold=0.2,
     scaler_type=None,
+    loop_removal="True",
 ):
     """
     Creates Data object of pytorch_geometric using graph features and edge list
@@ -175,6 +184,8 @@ def data_preparation(
                 f"Extracting features of object {i} of {adj_mat.shape[0]} "
             )
 
+            if loop_removal == "True":
+                np.fill_diagonal(adj_mat[i], 0)
             G = nx.from_numpy_matrix(adj_mat[i], create_using=nx.Graph)
 
             ## Extract features
@@ -287,6 +298,7 @@ def main():
         adj_mat_type=args.adj_mat_type,
         threshold=args.threshold,
         scaler_type=args.data_scaler_type,
+        loop_removal=args.loop_removal,
     )
 
     print("Normal subject:")
