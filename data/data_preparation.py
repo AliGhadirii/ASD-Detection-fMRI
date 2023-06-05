@@ -109,9 +109,9 @@ def data_preparation(
     idx2 = adj_path.rfind(".")
     fc_matrix_kind = adj_path[idx1:idx2]
     filename = (
-        f"features_{fc_matrix_kind}_{adj_mat_type}_{str(threshold)}_{scaler_type}"
+        f"features_{fc_matrix_kind}_{adj_mat_type}_{str(threshold)}_{scaler_type}_3"
     )
-
+    min_edge = 10000
     try:  # check if feature file already exists
 
         # load features
@@ -135,8 +135,8 @@ def data_preparation(
                         "eccentricity",
                         # "ts_mean",
                         # "ts_variance",
-                        "ts_skewness",
-                        "ts_kurtosis",
+                        # "ts_skewness",
+                        # "ts_kurtosis",
                     ],
                 )
                 normal_dfs.append(df)
@@ -149,8 +149,8 @@ def data_preparation(
                         "eccentricity",
                         # "ts_mean",
                         # "ts_variance",
-                        "ts_skewness",
-                        "ts_kurtosis",
+                        # "ts_skewness",
+                        # "ts_kurtosis",
                     ],
                 )
                 ASD_dfs.append(df)
@@ -167,6 +167,7 @@ def data_preparation(
                 "adj_mat_type should be one of these: ['Weighted', 'weighted_threshold', 'binary_threshold']"
             )
         else:
+            print("binaryyy")
             if adj_mat_type == "weighted_threshold":
                 adj_mat[adj_mat <= threshold] = 0
             elif adj_mat_type == "binary_threshold":
@@ -187,6 +188,9 @@ def data_preparation(
             if loop_removal == "True":
                 np.fill_diagonal(adj_mat[i], 0)
             G = nx.from_numpy_matrix(adj_mat[i], create_using=nx.Graph)
+            print(f"number of edges: {G.number_of_edges()}")
+            if G.number_of_edges() < min_edge:
+                min_edge = G.number_of_edges()
 
             ## Extract features
 
@@ -203,8 +207,8 @@ def data_preparation(
                         "eccentricity": dict(nx.eccentricity(G)).values(),
                         # "ts_mean": time_series_ls[i].mean(axis=0),
                         # "ts_variance": time_series_ls[i].var(axis=0),
-                        "ts_skewness": skew(time_series_ls[i], axis=0),
-                        "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
+                        # "ts_skewness": skew(time_series_ls[i], axis=0),
+                        # "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
                     }
                 )
             else:
@@ -224,8 +228,8 @@ def data_preparation(
                         "eccentricity": eccentricity.values(),
                         # "ts_mean": time_series_ls[i].mean(axis=0),
                         # "ts_variance": time_series_ls[i].var(axis=0),
-                        "ts_skewness": skew(time_series_ls[i], axis=0),
-                        "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
+                        # "ts_skewness": skew(time_series_ls[i], axis=0),
+                        # "ts_kurtosis": kurtosis(time_series_ls[i], axis=0),
                     }
                 )
 
@@ -258,8 +262,8 @@ def data_preparation(
                         "eccentricity",
                         # "ts_mean",
                         # "ts_variance",
-                        "ts_skewness",
-                        "ts_kurtosis",
+                        # "ts_skewness",
+                        # "ts_kurtosis",
                     ],
                 )
                 normal_dfs.append(df)
@@ -272,8 +276,8 @@ def data_preparation(
                         "eccentricity",
                         # "ts_mean",
                         # "ts_variance",
-                        "ts_skewness",
-                        "ts_kurtosis",
+                        # "ts_skewness",
+                        # "ts_kurtosis",
                     ],
                 )
                 ASD_dfs.append(df)
@@ -283,7 +287,7 @@ def data_preparation(
         with open(path, "wb") as fp:
             pickle.dump(data_list, fp)
         print(f"Features are successfully extracted and stored in: {path}")
-
+        print(min_edge)
         return normal_dfs, ASD_dfs
 
 
@@ -302,10 +306,10 @@ def main():
     )
 
     print("Normal subject:")
-    print(normal_dfs[36].describe())
+    print(normal_dfs[0].describe())
     print()
     print("Subject with ASD:")
-    print(ASD_dfs[36].describe())
+    print(ASD_dfs[1].describe())
 
 
 if __name__ == "__main__":
